@@ -1,0 +1,112 @@
+diff --git a/README.md b/README.md
+index a454b677189f55ea3aed1924c26d4b255663ae4f..0fa268edfcdaf24bc2f9848bf361c0bfa3100f9f 100644
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1,104 @@
+-# Tideforcesender Backend
+-Flask API for sending emails with attachments using SMTP rotation.
+\ No newline at end of file
++# Tedi Messenger v2 (уникальный MVP с приватностью)
++
++Это готовый MVP мессенджера в стиле Telegram, но с уникальными отличиями:
++- вход по телефону **или username**;
++- **invite_code** для вступления в чат;
++- приватные профили (видимость телефона/last seen/приглашений);
++- **secret-сообщения** с TTL и автоудалением;
++- сессии с временем жизни и logout;
++- пагинация истории сообщений (`before_id`, `limit`).
++
++## Запуск
++
++```bash
++python3 -m venv .venv
++source .venv/bin/activate
++pip install -r requirements.txt
++python app.py
++```
++
++Открыть: `http://localhost:5000`
++
++## API (v2)
++
++### Auth
++- `POST /api/auth/register`
++- `POST /api/auth/login`
++- `POST /api/auth/logout`
++
++Пример регистрации:
++```json
++{
++  "phone": "+79990001122",
++  "username": "ivan_dev",
++  "name": "Ivan",
++  "password": "secret123"
++}
++```
++
++### Privacy
++- `GET /api/privacy`
++- `PUT /api/privacy`
++
++Пример:
++```json
++{
++  "phone_visibility": "contacts",
++  "last_seen_visibility": "contacts",
++  "allow_invites": "everyone"
++}
++```
++
++Допустимые значения: `everyone`, `contacts`, `nobody`.
++
++### Chats
++- `GET /api/chats`
++- `POST /api/chats`
++- `POST /api/chats/join`
++
++Создание:
++```json
++{
++  "title": "Проект",
++  "participant": "@name_or_phone"
++}
++```
++
++Join:
++```json
++{
++  "invite_code": "abc123..."
++}
++```
++
++### Messages
++- `GET /api/chats/{chat_id}/messages?before_id=123&limit=50`
++- `POST /api/chats/{chat_id}/messages`
++
++Обычное сообщение:
++```json
++{ "text": "Привет" }
++```
++
++Secret-сообщение:
++```json
++{
++  "text": "Самоуничтожится",
++  "is_secret": true,
++  "ttl_seconds": 30
++}
++```
++
++## Тесты
++
++```bash
++python3 -m unittest -v tests/test_app.py
++```
++
++## Что добавить для production
++- полноценные JWT + refresh/rotation;
++- OTP/SMS и anti-fraud;
++- медиа-файлы через S3;
++- WebSocket вместо polling;
++- CI/CD (GitHub Actions / GitLab CI);
++- юридический аудит перед запуском в РФ.
