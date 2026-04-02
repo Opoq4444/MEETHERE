@@ -1,0 +1,9 @@
+diff --git a/requirements.txt b/requirements.txt
+index 8ab6294c6b5339b46e123e5ac62dd6651ae09c68..6213353202a5e5dc6528f5dbfa020df913310b5c 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1 +1,2 @@
+-flask
+\ No newline at end of file
++flask>=3.0.0
++werkzeug>=3.0.0
