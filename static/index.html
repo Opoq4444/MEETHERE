@@ -1,0 +1,241 @@
+diff --git a/static/index.html b/static/index.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..030edcdeb3c2ec8d83acc361fe3936add4c4dbb2
+--- /dev/null
++++ b/static/index.html
+@@ -0,0 +1,235 @@
++<!doctype html>
++<html lang="ru">
++<head>
++  <meta charset="UTF-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1" />
++  <title>Tedi Messenger v2</title>
++  <style>
++    body { margin: 0; font-family: Inter, Arial, sans-serif; background: #0b1020; color: #dbeafe; }
++    .container { display: grid; grid-template-columns: 340px 1fr; height: 100vh; }
++    .left { border-right: 1px solid #1f2a44; padding: 14px; overflow-y: auto; }
++    .right { display: flex; flex-direction: column; }
++    .messages { flex: 1; overflow-y: auto; padding: 14px; }
++    .message { border: 1px solid #1f2a44; background: #101934; border-radius: 10px; padding: 8px; margin-bottom: 8px; }
++    .secret { border-color: #a855f7; }
++    .meta { color: #93c5fd; font-size: 12px; margin-top: 4px; }
++    .row { display: flex; gap: 8px; margin-bottom: 8px; }
++    input, select, button { border-radius: 8px; border: 1px solid #314170; background: #0f1830; color: #e2e8f0; padding: 8px; }
++    button { background: #2563eb; border: none; cursor: pointer; }
++    .item { border: 1px solid #223056; border-radius: 8px; padding: 8px; margin-bottom: 6px; cursor: pointer; }
++    .item.active { border-color: #60a5fa; }
++    .hidden { display: none; }
++    .small { font-size: 12px; color: #9fb4d9; }
++  </style>
++</head>
++<body>
++  <div id="auth" style="max-width:580px;margin:36px auto;">
++    <h2>Tedi Messenger v2</h2>
++    <p class="small">Уникальный режим: приватные профили + секретные сообщения с автоудалением.</p>
++    <div class="row">
++      <input id="name" placeholder="Имя" />
++      <input id="username" placeholder="username (опц.)" />
++    </div>
++    <div class="row">
++      <input id="phone" placeholder="Телефон или username для входа" />
++      <input id="password" type="password" placeholder="Пароль" />
++    </div>
++    <div class="row">
++      <button onclick="register()">Регистрация</button>
++      <button onclick="login()">Войти</button>
++    </div>
++    <div id="authStatus" class="small"></div>
++  </div>
++
++  <div id="app" class="container hidden">
++    <div class="left">
++      <h3>Чаты</h3>
++      <div class="row">
++        <input id="chatTitle" placeholder="Название" />
++      </div>
++      <div class="row">
++        <input id="participant" placeholder="Телефон или username" />
++      </div>
++      <div class="row">
++        <button onclick="createChat()">Создать</button>
++        <button onclick="loadChats()">Обновить</button>
++      </div>
++
++      <h4>Войти по invite_code</h4>
++      <div class="row">
++        <input id="inviteCode" placeholder="invite_code" />
++        <button onclick="joinChat()">Join</button>
++      </div>
++
++      <h4>Конфиденциальность</h4>
++      <div class="row">
++        <select id="phone_visibility">
++          <option value="everyone">Телефон: everyone</option>
++          <option value="contacts">Телефон: contacts</option>
++          <option value="nobody">Телефон: nobody</option>
++        </select>
++      </div>
++      <div class="row">
++        <select id="last_seen_visibility">
++          <option value="everyone">Last seen: everyone</option>
++          <option value="contacts">Last seen: contacts</option>
++          <option value="nobody">Last seen: nobody</option>
++        </select>
++      </div>
++      <div class="row">
++        <select id="allow_invites">
++          <option value="everyone">Invite: everyone</option>
++          <option value="contacts">Invite: contacts</option>
++          <option value="nobody">Invite: nobody</option>
++        </select>
++        <button onclick="savePrivacy()">Сохранить</button>
++      </div>
++
++      <div id="chatList"></div>
++    </div>
++
++    <div class="right">
++      <div class="messages" id="messages"></div>
++      <div style="padding:12px;border-top:1px solid #1f2a44;">
++        <div class="row">
++          <input id="text" placeholder="Сообщение" style="flex:1" />
++          <label class="small"><input type="checkbox" id="is_secret" /> secret</label>
++          <input id="ttl" type="number" min="5" max="86400" value="30" style="width:110px" placeholder="TTL sec" />
++          <button onclick="sendMessage()">Отправить</button>
++        </div>
++      </div>
++    </div>
++  </div>
++
++<script>
++let token = localStorage.getItem('token') || '';
++let selectedChat = null;
++let pollTimer = null;
++
++function api(path, method='GET', body=null) {
++  const headers = {'Content-Type': 'application/json'};
++  if (token) headers.Authorization = `Bearer ${token}`;
++  return fetch(path, { method, headers, body: body ? JSON.stringify(body) : null })
++    .then(async r => ({ status: r.status, data: await r.json() }));
++}
++
++function setAuthStatus(t){ document.getElementById('authStatus').innerText = t; }
++
++async function register(){
++  const res = await api('/api/auth/register', 'POST', {
++    name: name.value.trim(),
++    username: username.value.trim(),
++    phone: phone.value.trim(),
++    password: password.value
++  });
++  setAuthStatus(res.status === 201 ? 'Ок. Теперь вход.' : (res.data.error || 'Ошибка'));
++}
++
++async function login(){
++  const res = await api('/api/auth/login', 'POST', {
++    phone: phone.value.trim(),
++    password: password.value
++  });
++  if (res.status !== 200) return setAuthStatus(res.data.error || 'Ошибка входа');
++  token = res.data.token;
++  localStorage.setItem('token', token);
++  auth.classList.add('hidden');
++  app.classList.remove('hidden');
++  await loadChats();
++  await loadPrivacy();
++}
++
++async function loadChats(){
++  const res = await api('/api/chats');
++  if (res.status !== 200) return;
++  chatList.innerHTML = '';
++  res.data.forEach(c => {
++    const el = document.createElement('div');
++    el.className = 'item' + (selectedChat === c.id ? ' active' : '');
++    el.innerHTML = `<b>${c.title}</b><div class='small'>#${c.id} · code: ${c.invite_code}</div>`;
++    el.onclick = () => selectChat(c.id);
++    chatList.appendChild(el);
++  });
++}
++
++async function createChat(){
++  const res = await api('/api/chats', 'POST', {
++    title: chatTitle.value.trim(),
++    participant: participant.value.trim()
++  });
++  if (res.status === 201){
++    chatTitle.value = '';
++    participant.value = '';
++    loadChats();
++  } else alert(res.data.error || 'Ошибка');
++}
++
++async function joinChat(){
++  const res = await api('/api/chats/join', 'POST', { invite_code: inviteCode.value.trim() });
++  if (res.status === 200){
++    inviteCode.value = '';
++    loadChats();
++  } else alert(res.data.error || 'Ошибка join');
++}
++
++async function selectChat(id){
++  selectedChat = id;
++  await loadChats();
++  await loadMessages();
++  if (pollTimer) clearInterval(pollTimer);
++  pollTimer = setInterval(loadMessages, 2500);
++}
++
++async function loadMessages(){
++  if (!selectedChat) return;
++  const res = await api(`/api/chats/${selectedChat}/messages`);
++  if (res.status !== 200) return;
++  messages.innerHTML = '';
++  res.data.forEach(m => {
++    const el = document.createElement('div');
++    el.className = 'message' + (m.is_secret ? ' secret' : '');
++    const who = `${m.sender.name}${m.sender.username ? ' @'+m.sender.username : ''}`;
++    const phoneTxt = m.sender.phone ? ` · ${m.sender.phone}` : '';
++    const ls = m.sender.last_seen_at ? ` · last seen ${m.sender.last_seen_at}` : '';
++    const sec = m.is_secret ? ` · secret ttl=${m.ttl_seconds}s` : '';
++    el.innerHTML = `<div><b>${who}</b>${phoneTxt}: ${m.text}</div><div class='meta'>${m.created_at}${ls}${sec}</div>`;
++    messages.appendChild(el);
++  });
++  messages.scrollTop = messages.scrollHeight;
++}
++
++async function sendMessage(){
++  if (!selectedChat) return alert('Выбери чат');
++  const payload = { text: text.value.trim(), is_secret: is_secret.checked };
++  if (is_secret.checked) payload.ttl_seconds = Number(ttl.value);
++  const res = await api(`/api/chats/${selectedChat}/messages`, 'POST', payload);
++  if (res.status === 201){ text.value=''; await loadMessages(); }
++  else alert(res.data.error || 'Ошибка отправки');
++}
++
++async function loadPrivacy(){
++  const res = await api('/api/privacy');
++  if (res.status !== 200) return;
++  phone_visibility.value = res.data.phone_visibility;
++  last_seen_visibility.value = res.data.last_seen_visibility;
++  allow_invites.value = res.data.allow_invites;
++}
++
++async function savePrivacy(){
++  const res = await api('/api/privacy', 'PUT', {
++    phone_visibility: phone_visibility.value,
++    last_seen_visibility: last_seen_visibility.value,
++    allow_invites: allow_invites.value
++  });
++  if (res.status !== 200) alert(res.data.error || 'Ошибка');
++}
++
++if (token){
++  auth.classList.add('hidden');
++  app.classList.remove('hidden');
++  loadChats();
++  loadPrivacy();
++}
++</script>
++</body>
++</html>
